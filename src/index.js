@@ -17,12 +17,11 @@ function checksExistsUserAccount(request, response, next) {
   if (user != undefined) {
     request.userExists = true;
     request.user = user;
-  } else {
-    request.userExists = false;
-    request.user = null;
-  }
 
-  next();
+    next();
+  } else {
+    return response.status(404).json({ error: "Usuário não encontrado" });
+  }
 }
 
 app.post("/users", (request, response) => {
@@ -34,6 +33,14 @@ app.post("/users", (request, response) => {
     username,
     todos: [],
   };
+
+  const userAlreadyExists = users.some((user) => user.username === username);
+
+  if (userAlreadyExists) {
+    return response
+      .status(400)
+      .json({ error: "Já existe um usuário com esse username" });
+  }
 
   users.push(newUser);
 
@@ -51,7 +58,7 @@ app.get("/todos", checksExistsUserAccount, (request, response) => {
 
     const userTodos = request.user.todos;
 
-    return response.json({ success: true, todos: userTodos });
+    return response.json(userTodos);
   } catch (error) {
     return response.json({ success: false, error });
   }
@@ -102,6 +109,12 @@ app.put("/todos/:id", checksExistsUserAccount, (request, response) => {
 
     const indexTodo = userTodos.findIndex((todo) => todo.id === todoId);
 
+    if (indexTodo < 0) {
+      return response
+        .status(404)
+        .json({ error: "Não encontramos a tarefa passada..." });
+    }
+
     const oldTodo = users[indexUser].todos[indexTodo];
     const todoUpdated = {
       id: oldTodo.id,
@@ -113,10 +126,9 @@ app.put("/todos/:id", checksExistsUserAccount, (request, response) => {
 
     users[indexUser].todos[indexTodo] = todoUpdated;
 
-    return response.json({ success: true, old: oldTodo, updated: todoUpdated });
+    return response.json(todoUpdated);
   } catch (error) {
     return response.json({
-      success: false,
       error: "Não foi possível atualizar o registro",
     });
   }
@@ -140,14 +152,19 @@ app.patch("/todos/:id/done", checksExistsUserAccount, (request, response) => {
 
     const indexTodo = userTodos.findIndex((todo) => todo.id === todoId);
 
+    if (indexTodo < 0) {
+      return response
+        .status(404)
+        .json({ error: "Não encontramos a tarefa passada..." });
+    }
+
     const todo = users[indexUser].todos[indexTodo];
 
     users[indexUser].todos[indexTodo].done = true;
 
-    return response.json({ success: true, todo: todo });
+    return response.json(todo);
   } catch (error) {
     return response.json({
-      success: false,
       message: "Não foi possível atualizar o status para 'Feito'",
     });
   }
@@ -171,9 +188,15 @@ app.delete("/todos/:id", checksExistsUserAccount, (request, response) => {
 
     const indexTodo = userTodos.findIndex((todo) => todo.id === todoId);
 
+    if (indexTodo < 0) {
+      return response
+        .status(404)
+        .json({ error: "Não encontramos a tarefa passada..." });
+    }
+
     users[indexUser].todos.splice(indexTodo, 1);
 
-    return response.json({
+    return response.status(204).json({
       success: true,
       message: "Tarefa deletada com sucesso!",
     });
